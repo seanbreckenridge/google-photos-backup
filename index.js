@@ -5,7 +5,21 @@ import { moveFile } from 'move-file'
 import fsP from 'node:fs/promises'
 import fs from 'node:fs'
 import { exiftool } from 'exiftool-vendored'
+import { createInterface } from "readline";
 
+function askQuestion(query) {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) =>
+    rl.question(query, (ans) => {
+      rl.close();
+      resolve(ans);
+    }),
+  );
+}
 
 chromium.use(stealth())
 
@@ -82,13 +96,15 @@ const getMonthAndYear = async (metadata, page) => {
   const browser = await chromium.launchPersistentContext(path.resolve(userDataDir), {
     headless,
     acceptDownloads: true,
-    channel: 'chrome', // possible values: chrome, msedge and chromium
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    channel: 'chromium', // possible values: chrome, msedge and chromium
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
   })
 
   const page = await browser.newPage()
 
-  await page.goto('https://photos.google.com')
+  await page.goto('https://accounts.google.com/')
+
+  await askQuestion("Log in to google on browser, go to photos.google.com to test, hit enter once you're done\n");
 
   const latestPhoto = await getLatestPhoto(page)
   console.log('Latest Photo:', latestPhoto)
