@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+
+"""
+Though its not likely, makes sure we're not clobbering any names by adding a __1.mov __2.mov etc.
+
+can run multiple times, pass --trash to remove (using 'trash-put') the zip files once everything has been extracted
+should run 'fdupes -r ./' (or some similar command) beforehand to remove duplicate files
+
+basically I periodically run:
+
+fdupes -r ./download && read && fdupes -r ./download -dN  # print, confirm (hit enter), then delete duplicates
+./unzip-movies
+./unzip-movies --trash
+
+deps: python3 -m pip install click
+optional deps: trash-put to move items to trash (otherwise moves them to ~/.cache/trash)
+"""
+
+
+import filecmp
+import shutil
+import subprocess
+from typing import Tuple, Iterator
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from zipfile import ZipFile
+
+import click
+
+
+MOVIE_EXTS = [".mp4", ".mov"]
+
+
+def is_modified_filename(inp: Path) -> Tuple[bool, int]:
+    """
+    >>> IMG_42034.mov
+    False, 0
+    >>> IMG_42034__1.mov
+    True, 1
+    >>> IMG_42034__5.mov
+    True, 5
+    """
+    if "__" in inp.stem:
+        _, _, part = inp.stem.rpartition("__")
+        return True, int(part)
+    return False, 0
+
+
+def movies_in_dir(p: Path) -> Iterator[Path]:
+    for f in p.iterdir():
+        if f.suffix in MOVIE_EXTS:
+            yield f
+
+
+def trash_put(p: Path) -> None:
+    if p.exists():
+        click.echo(f"Trashing file {p}")
+        if shutil.which("trash-put"):
+            subprocess.run(["trash-put", "-v", str(p)])
+        else:
+            # move to a folder in ~/.cache/trash
+            trash_dir = Path("~/.cache/trash").expanduser()
+            if not trash_dir.exists():
+                trash_dir.mkdir(parents=True)
+            shutil.move(str(p), "~/.cache/trash")
+
+
+@click.command()
+@click.option(
+    "--trash", is_flag=True, help="Remove the zip file once extracted", default=False
+)
+def main(trash: bool) -> None:
+    for p in Path("download").rglob("*.zip"):
+        directory = p.parent
+        movie_dir = directory / "movies"
+        if not movie_dir.exists():
+            movie_dir.mkdir(parents=True)
+        with TemporaryDirectory() as td:
+            with ZipFile(p) as zf:
+                zf.extractall(td)
+            # find the movie file
+            mvs = list(movies_in_dir(Path(td)))
+            if not mvs:
+                raise ValueError(f"No movie files found in {p} {td}")
+            for f in mvs:
+                new_path = movie_dir.joinpath(f.name)
+                if new_path.exists():
+                    click.echo(f"Target {new_path} already exists...", err=True)
+                    # if these are actually the same file, then skip
+                    if filecmp.cmp(str(new_path), str(f)):
+                        click.echo(f"Already extracted {p}, skipping...", err=True)
+                        if trash:
+                            trash_put(p)
+                    else:
+                        # prevent overwriting if the movie file is the same name
+                        is_already_suffixed_file, old_num = is_modified_filename(
+                            new_path
+                        )
+                        if is_already_suffixed_file:
+                            new_path = (
+                                new_path.parent
+                                / f"{new_path.stem.rsplit("__", maxsplit=1)[0]}__{old_num + 1}{f.suffix}"
+                            )
+                            click.echo(f"Found {f}, renaming to {new_path}")
+                        else:
+                            new_path = (
+                                new_path.parent / f"{new_path.stem}__1.{f.suffix}"
+                            )
+                        click.echo(f"Copying {f} to {new_path}")
+                        shutil.copy2(f, new_path)
+                        trash_put(p)
+                else:
+                    click.echo(f"Copying {f} to {new_path}")
+                    shutil.copy2(f, new_path)
+                    trash_put(p)
+
+
+if __name__ == "__main__":
+    main(prog_name="unzip-movies")
