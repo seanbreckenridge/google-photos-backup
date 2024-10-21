@@ -104,7 +104,7 @@ def main(trash: bool) -> None:
                             click.echo(f"Found {f}, renaming to {new_path}")
                         else:
                             new_path = (
-                                new_path.parent / f"{new_path.stem}__1.{f.suffix}"
+                                new_path.parent / f"{new_path.stem}__1{f.suffix}"
                             )
                         click.echo(f"Copying {f} to {new_path}")
                         shutil.copy2(f, new_path)
