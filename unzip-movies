@@ -79,10 +79,6 @@ def trash_put(p: Path) -> None:
 )
 def main(trash: bool) -> None:
     for p in Path("download").rglob("*.zip"):
-        directory = p.parent
-        movie_dir = directory / "movies"
-        if not movie_dir.exists():
-            movie_dir.mkdir(parents=True)
         with TemporaryDirectory() as td:
             with ZipFile(p) as zf:
                 zf.extractall(td)
@@ -91,7 +87,7 @@ def main(trash: bool) -> None:
             if not mvs:
                 raise ValueError(f"No movie files found in {p} {td}")
             for f in mvs:
-                new_path = movie_dir.joinpath(f.name)
+                new_path = p.parent.joinpath(f.name)
                 if new_path.exists():
                     click.echo(f"Target {new_path} already exists...", err=True)
                     # if these are actually the same file, then skip
