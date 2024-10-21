@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 
 """
-Though its not likely, makes sure we're not clobbering any names by adding a __1.mov __2.mov etc.
+Makes sure we're not clobbering any names by adding a __1.mov __2.mov etc.
 
 can run multiple times, pass --trash to remove (using 'trash-put') the zip files once everything has been extracted
 should run 'fdupes -r ./' (or some similar command) beforehand to remove duplicate files
 
-basically I periodically run:
-
+I use:
 fdupes -r ./download && read && fdupes -r ./download -dN  # print, confirm (hit enter), then delete duplicates
-./unzip-movies
-./unzip-movies --trash
+
+If you have over 85 or so movies in a single month, this will start overwriting files
+because index.js truncates items to 255 characters.
+
+So, to prevent that, while running the export code:
+while sleep 5; do node index.js --headless=false; done
+
+in another terminal I run:
+while sleep 10; do ./unzip-movies --trash; done
+
+which unzips files every 10 seconds as they're downloaded
 
 deps: python3 -m pip install click
 optional deps: trash-put to move items to trash (otherwise moves them to ~/.cache/trash)
@@ -103,9 +111,7 @@ def main(trash: bool) -> None:
                             )
                             click.echo(f"Found {f}, renaming to {new_path}")
                         else:
-                            new_path = (
-                                new_path.parent / f"{new_path.stem}__1{f.suffix}"
-                            )
+                            new_path = new_path.parent / f"{new_path.stem}__1{f.suffix}"
                         click.echo(f"Copying {f} to {new_path}")
                         shutil.copy2(f, new_path)
                         if trash:
