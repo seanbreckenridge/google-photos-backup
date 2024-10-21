@@ -108,11 +108,13 @@ def main(trash: bool) -> None:
                             )
                         click.echo(f"Copying {f} to {new_path}")
                         shutil.copy2(f, new_path)
-                        trash_put(p)
+                        if trash:
+                            trash_put(p)
                 else:
                     click.echo(f"Copying {f} to {new_path}")
                     shutil.copy2(f, new_path)
-                    trash_put(p)
+                    if trash:
+                        trash_put(p)
 
 
 if __name__ == "__main__":
